@@ -14,6 +14,8 @@
 # gitstats.rb (file COPYING in the main directory). If not, see
 # <http://www.gnu.org/licenses/>.
 
+require 'fileutils'
+
 home = `git rev-parse --show-toplevel`.strip
 log = `git log --pretty=format:"####%aN####%ct####%H####%s" --reverse --summary --numstat --encoding=UTF-8 --no-renames`
 
@@ -88,27 +90,31 @@ commits.each do |c|
 end
 files_since_last_run = files_since_last_run.uniq.sort
 
-### delete files that are not on whitelist, handle adding new files to repo gracefully (they are added to the whitelist)
-if File.exist? "#{home}/.whitelist"
-  whitelist = File.readlines("#{home}/.whitelist").map{|l| l.strip}
-  blacklist = File.exist("#{home}/.blacklist") ? File.readlines("#{home}/.blacklist").map{|l| l.strip} : []
-  newfiles = files_since_last_run - blacklist
-  checklist = (whitelist + newfiles).uniq.sort
+### delete files that are not on includelist, handle adding new files to repo gracefully (they are added to the includelist)
+FileUtils.mv "#{home}/.whitelist", "#{home}/.includelist" if File.exist? "#{home}/.whitelist"
+FileUtils.mv "#{home}/.whitelist.old", "#{home}/.includelist" if File.exist? "#{home}/.whitelist.old"
+FileUtils.mv "#{home}/.blacklist", "#{home}/.excludelist" if File.exist? "#{home}/.blacklist"
+FileUtils.mv "#{home}/.blacklist.old", "#{home}/.excludelist" if File.exist? "#{home}/.blacklist.old"
+if File.exist? "#{home}/.includelist"
+  includelist = File.readlines("#{home}/.includelist").map{|l| l.strip}
+  excludelist = File.exist?("#{home}/.excludelist") ? File.readlines("#{home}/.excludelist").map{|l| l.strip} : []
+  newfiles = files_since_last_run - excludelist
+  checklist = (includelist + newfiles).uniq.sort
   commits.each do |c|
     c.files.delete_if do |k,v|
       !(checklist.include?(k))
     end
   end
-  if (blacklist = files - checklist).any?
-    text = [ "### the .blacklist is purely for documentation purposes", "### add lines from here to the .whitelist to make a difference", "" ]
-    File.write("#{home}/.blacklist",(text + blacklist.sort).join("\n") + "\n")
+  if (excludelist = files - checklist).any?
+    text = [ "### the .excludelist is purely for documentation purposes", "### add lines from here to the .includelist to make a difference", "" ]
+    File.write("#{home}/.excludelist",(text + excludelist.sort).join("\n") + "\n")
   end
-  if (checklist - whitelist).any?
-    File.write("#{home}/.whitelist",checklist.join("\n") + "\n")
-    File.write("#{home}/.whitelist.old",whitelist.join("\n") + "\n")
+  if (checklist - includelist).any?
+    File.write("#{home}/.includelist",checklist.join("\n") + "\n")
+    File.write("#{home}/.includelist.old",includelist.join("\n") + "\n")
   end
 else
-  File.write("#{home}/.whitelist",files.join("\n") + "\n")
+  File.write("#{home}/.includelist",files.join("\n") + "\n")
 end
 
 ### commits per author
