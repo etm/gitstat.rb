@@ -68,7 +68,7 @@ end
 files = files.uniq.sort
 
 ### Determine last run
-lastrun = if File.exists? "#{home}/.statsrun"
+lastrun = if File.exist? "#{home}/.statsrun"
   lr = File.read("#{home}/.statsrun").strip
 else
   commits.last.id
@@ -89,9 +89,9 @@ end
 files_since_last_run = files_since_last_run.uniq.sort
 
 ### delete files that are not on whitelist, handle adding new files to repo gracefully (they are added to the whitelist)
-if File.exists? "#{home}/.whitelist"
+if File.exist? "#{home}/.whitelist"
   whitelist = File.readlines("#{home}/.whitelist").map{|l| l.strip}
-  blacklist = File.exists?("#{home}/.blacklist") ? File.readlines("#{home}/.blacklist").map{|l| l.strip} : []
+  blacklist = File.exist("#{home}/.blacklist") ? File.readlines("#{home}/.blacklist").map{|l| l.strip} : []
   newfiles = files_since_last_run - blacklist
   checklist = (whitelist + newfiles).uniq.sort
   commits.each do |c|
@@ -117,7 +117,7 @@ commits.each do |c|
   authors[c.author] ||= []
   authors[c.author] << c
 end
-authorfilter = if File.exists? "#{home}/.statsauthors"
+authorfilter = if File.exist? "#{home}/.statsauthors"
   sa = File.readlines("#{home}/.statsauthors").map{|l| (l =~ /^###/ || l =~ /^\s*$/) ? nil : l}.compact
   if (newauthors = authors.keys - sa.map{|x| x.strip}).any?
     File.open("#{home}/.statsauthors", 'a') { |f| f.write newauthors.join("\n") + "\n" }
@@ -177,9 +177,25 @@ authors.each do |a,c|
   end
 end
 
+gcount = 0
+authors.each do |a,c|
+  lines[a].each do |k,v|
+    gcount += v.to_i
+  end
+end
+relstats = {}
+authors.each do |a,c|
+  lcount = 0
+  lines[a].each do |k,v|
+    lcount += v.to_i
+  end
+  relstats[a] = "%1.1f%%" % (lcount / (gcount / 100.to_f))
+end
+
 statstxt = ""
 authors.each do |a,c|
   statstxt << "#{a} (#{c.length} commits)\n"
+  statstxt << "    Work (lc based): \t#{relstats[a]}\n"
   lines[a].each do |k,v|
     statstxt << "    Lines #{k}:\t#{v}\n"
   end
